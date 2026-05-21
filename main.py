@@ -3,49 +3,103 @@ import pdfplumber
 from docx import Document
 import re
 import os
+import traceback
+
+# =========================
+# VARIABLES
+# =========================
 
 BOT_TOKEN = os.environ.get("BOT_TOKEN")
 API_ID = int(os.environ.get("API_ID"))
 API_HASH = os.environ.get("API_HASH")
 
+# =========================
+# PYROGRAM CLIENT
+# =========================
+
 app = Client(
-    "fancy-bot",
+    "bot",
     bot_token=BOT_TOKEN,
     api_id=API_ID,
     api_hash=API_HASH
 )
 
-print("Bot Running...")
+print("✅ BOT STARTED")
 
+
+# =========================
+# START COMMAND
+# =========================
+
+@app.on_message(filters.command("start"))
+async def start_command(client, message):
+
+    await message.reply_text(
+        "✅ Fancy Sort Bot Active\n\nSend PDF / DOCX / TXT"
+    )
+
+
+# =========================
+# DEBUG MESSAGE
+# =========================
+
+@app.on_message(filters.text)
+async def debug_text(client, message):
+
+    print("TEXT RECEIVED")
+
+
+# =========================
+# EXTRACT NUMBERS
+# =========================
 
 def extract_numbers(text):
 
-    nums = re.findall(r'\d{8,15}', text)
+    return list(set(
+        re.findall(r"\d{8,15}", text)
+    ))
 
-    return list(set(nums))
 
+# =========================
+# FANCY SCORE
+# =========================
 
 def score_number(number):
 
     score = 0
 
-    if re.search(r'(\d)\1{2,}', number):
+    # repeated digits
+    if re.search(r"(\d)\1{2,}", number):
         score += 50
 
-    if re.search(r'1234|2345|3456|4567|5678|6789', number):
+    # ascending
+    if re.search(
+        r"1234|2345|3456|4567|5678|6789",
+        number
+    ):
         score += 40
 
-    if re.search(r'9876|8765|7654|6543|5432|4321', number):
+    # descending
+    if re.search(
+        r"9876|8765|7654|6543|5432|4321",
+        number
+    ):
         score += 40
 
-    if re.search(r'(\d\d)\1+', number):
+    # repeated pair
+    if re.search(r"(\d\d)\1+", number):
         score += 30
 
-    if re.search(r'(\d)(\d)\1\2', number):
+    # alternating
+    if re.search(r"(\d)(\d)\1\2", number):
         score += 20
 
     return score
 
+
+# =========================
+# SORT FANCY
+# =========================
 
 def sort_fancy(numbers):
 
@@ -70,6 +124,10 @@ def sort_fancy(numbers):
     return result
 
 
+# =========================
+# READ PDF
+# =========================
+
 def read_pdf(path):
 
     text = ""
@@ -81,10 +139,15 @@ def read_pdf(path):
             extracted = page.extract_text()
 
             if extracted:
+
                 text += extracted + "\n"
 
     return text
 
+
+# =========================
+# READ DOCX
+# =========================
 
 def read_docx(path):
 
@@ -99,18 +162,27 @@ def read_docx(path):
     return text
 
 
-@app.on_message(filters.document)
-async def handle_file(client, message):
+# =========================
+# HANDLE DOCUMENT
+# =========================
 
-    print("File Received")
+@app.on_message(filters.document)
+async def handle_document(client, message):
+
+    print("📥 FILE RECEIVED")
 
     msg = await message.reply_text(
         "⏳ Processing File..."
     )
 
-    file_path = await message.download()
+    file_path = None
 
     try:
+
+        # download
+        file_path = await message.download()
+
+        print("DOWNLOADED:", file_path)
 
         text = ""
 
@@ -142,7 +214,11 @@ async def handle_file(client, message):
                 "❌ Unsupported File"
             )
 
+        print("TEXT LENGTH:", len(text))
+
         numbers = extract_numbers(text)
+
+        print("NUMBERS:", len(numbers))
 
         if not numbers:
 
@@ -150,9 +226,9 @@ async def handle_file(client, message):
                 "❌ No Numbers Found"
             )
 
-        sorted_nums = sort_fancy(numbers)
+        sorted_numbers = sort_fancy(numbers)
 
-        if not sorted_nums:
+        if not sorted_numbers:
 
             return await msg.edit(
                 "❌ No Fancy Numbers Found"
@@ -160,14 +236,18 @@ async def handle_file(client, message):
 
         output = ""
 
-        for i, item in enumerate(sorted_nums, start=1):
+        for i, item in enumerate(
+            sorted_numbers,
+            start=1
+        ):
 
             output += (
                 f"{i}. +{item['number']}\n"
             )
 
+        # split telegram messages
         chunks = [
-            output[i:i+4000]
+            output[i:i + 4000]
             for i in range(
                 0,
                 len(output),
@@ -177,34 +257,33 @@ async def handle_file(client, message):
 
         await msg.delete()
 
-        for part in chunks:
+        for chunk in chunks:
 
             await message.reply_text(
-                f"<code>{part}</code>",
+                f"<code>{chunk}</code>",
                 parse_mode="html"
             )
 
     except Exception as e:
 
-        print(e)
+        print(traceback.format_exc())
 
         await msg.edit(
-            f"❌ Error:\n{e}"
+            f"❌ ERROR:\n{e}"
         )
 
     finally:
 
-        if os.path.exists(file_path):
+        try:
 
-            os.remove(file_path)
+            if file_path and os.path.exists(file_path):
+
+                os.remove(file_path)
+
+        except:
+            pass
 
 
-@app.on_message(filters.command("start"))
-async def start_cmd(client, message):
-
-    await message.reply_text(
-        "✅ Fancy Sort Bot Active\n\nSend PDF / DOCX / TXT"
-    )
-
+print("🚀 STARTING BOT")
 
 app.run()
