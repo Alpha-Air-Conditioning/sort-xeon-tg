@@ -1,0 +1,14 @@
+{
+  "name": "fancy-number-bot",
+  "version": "1.0.0",
+  "description": "Telegram Fancy Number Sort Bot",
+  "main": "bot.js",
+  "scripts": {
+    "start": "node bot.js"
+  },
+  "dependencies": {
+    "mammoth": "^1.6.0",
+    "node-telegram-bot-api": "^0.66.0",
+    "pdf-parse": "^1.1.1"
+  }
+}
