@@ -4,9 +4,9 @@ from docx import Document
 import re
 import os
 
-BOT_TOKEN = "YOUR_BOT_TOKEN"
-API_ID = 123456
-API_HASH = "YOUR_API_HASH"
+BOT_TOKEN = "8746414348:AAGk6GEPF0RI37eFEFQ9GMkWYtQn_vO-Vy8"
+API_ID = 20669494
+API_HASH = "05394f5878be957d8d93662df071e875"
 
 app = Client(
     "fancy-bot",
