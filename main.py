@@ -4,9 +4,9 @@ from docx import Document
 import re
 import os
 
-BOT_TOKEN = "8746414348:AAGk6GEPF0RI37eFEFQ9GMkWYtQn_vO-Vy8"
-API_ID = 20669494
-API_HASH = "05394f5878be957d8d93662df071e875"
+BOT_TOKEN = os.environ.get("BOT_TOKEN")
+API_ID = int(os.environ.get("API_ID"))
+API_HASH = os.environ.get("API_HASH")
 
 app = Client(
     "fancy-bot",
@@ -29,23 +29,18 @@ def score_number(number):
 
     score = 0
 
-    # repeated
     if re.search(r'(\d)\1{2,}', number):
         score += 50
 
-    # ascending
     if re.search(r'1234|2345|3456|4567|5678|6789', number):
         score += 40
 
-    # descending
     if re.search(r'9876|8765|7654|6543|5432|4321', number):
         score += 40
 
-    # pair repeat
     if re.search(r'(\d\d)\1+', number):
         score += 30
 
-    # alternating
     if re.search(r'(\d)(\d)\1\2', number):
         score += 20
 
@@ -83,7 +78,10 @@ def read_pdf(path):
 
         for page in pdf.pages:
 
-            text += page.extract_text() or ""
+            extracted = page.extract_text()
+
+            if extracted:
+                text += extracted + "\n"
 
     return text
 
@@ -104,28 +102,30 @@ def read_docx(path):
 @app.on_message(filters.document)
 async def handle_file(client, message):
 
+    print("File Received")
+
     msg = await message.reply_text(
         "⏳ Processing File..."
     )
 
     file_path = await message.download()
 
-    text = ""
-
     try:
 
+        text = ""
+
         # PDF
-        if file_path.endswith(".pdf"):
+        if file_path.lower().endswith(".pdf"):
 
             text = read_pdf(file_path)
 
         # DOCX
-        elif file_path.endswith(".docx"):
+        elif file_path.lower().endswith(".docx"):
 
             text = read_docx(file_path)
 
         # TXT
-        else:
+        elif file_path.lower().endswith(".txt"):
 
             with open(
                 file_path,
@@ -136,7 +136,19 @@ async def handle_file(client, message):
 
                 text = f.read()
 
+        else:
+
+            return await msg.edit(
+                "❌ Unsupported File"
+            )
+
         numbers = extract_numbers(text)
+
+        if not numbers:
+
+            return await msg.edit(
+                "❌ No Numbers Found"
+            )
 
         sorted_nums = sort_fancy(numbers)
 
@@ -154,7 +166,6 @@ async def handle_file(client, message):
                 f"{i}. +{item['number']}\n"
             )
 
-        # telegram safe split
         chunks = [
             output[i:i+4000]
             for i in range(
@@ -178,7 +189,7 @@ async def handle_file(client, message):
         print(e)
 
         await msg.edit(
-            "❌ Error Processing File"
+            f"❌ Error:\n{e}"
         )
 
     finally:
@@ -186,6 +197,14 @@ async def handle_file(client, message):
         if os.path.exists(file_path):
 
             os.remove(file_path)
+
+
+@app.on_message(filters.command("start"))
+async def start_cmd(client, message):
+
+    await message.reply_text(
+        "✅ Fancy Sort Bot Active\n\nSend PDF / DOCX / TXT"
+    )
 
 
 app.run()
