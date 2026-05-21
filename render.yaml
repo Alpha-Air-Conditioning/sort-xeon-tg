@@ -1,9 +1,0 @@
-services:
-  - type: worker
-    name: fancy-number-bot
-    runtime: node
-    buildCommand: npm install
-    startCommand: npm start
-    envVars:
-      - key: BOT_TOKEN
-        sync: false
