@@ -3,39 +3,44 @@ const fs = require("fs");
 const pdfParse = require("pdf-parse");
 const mammoth = require("mammoth");
 
-const TOKEN = process.env.BOT_TOKEN;
+const TOKEN = "8746414348:AAGk6GEPF0RI37eFEFQ9GMkWYtQn_vO-Vy8";
 
 const bot = new TelegramBot(TOKEN, {
     polling: true
 });
 
-console.log("Bot Started...");
+console.log("Bot Running...");
 
 function extractNumbers(text) {
 
     const regex = /\d{8,15}/g;
 
-    const numbers = text.match(regex) || [];
+    const found = text.match(regex) || [];
 
-    return [...new Set(numbers)];
+    return [...new Set(found)];
 }
 
-function fancyScore(number) {
+function scoreNumber(number) {
 
     let score = 0;
 
+    // repeated digits
     if (/(\d)\1{2,}/.test(number))
         score += 50;
 
+    // ascending
     if (/1234|2345|3456|4567|5678|6789/.test(number))
         score += 40;
 
+    // descending
     if (/9876|8765|7654|6543|5432|4321/.test(number))
         score += 40;
 
+    // double repeat
     if (/(\d\d)\1+/.test(number))
         score += 30;
 
+    // alternating
     if (/(\d)(\d)\1\2/.test(number))
         score += 20;
 
@@ -48,7 +53,7 @@ function sortFancy(numbers) {
 
     numbers.forEach(num => {
 
-        const score = fancyScore(num);
+        const score = scoreNumber(num);
 
         if (score > 0) {
 
@@ -62,18 +67,19 @@ function sortFancy(numbers) {
     return result.sort((a, b) => b.score - a.score);
 }
 
-async function readFile(path, mime) {
+async function readDocument(path, mime) {
 
+    // PDF
     if (mime.includes("pdf")) {
 
-        const data =
-            await pdfParse(
-                fs.readFileSync(path)
-            );
+        const data = await pdfParse(
+            fs.readFileSync(path)
+        );
 
         return data.text;
     }
 
+    // DOCX
     if (
         mime.includes("word") ||
         mime.includes("document")
@@ -87,6 +93,7 @@ async function readFile(path, mime) {
         return result.value;
     }
 
+    // TXT
     return fs.readFileSync(path, "utf8");
 }
 
@@ -100,7 +107,7 @@ bot.on("document", async (msg) => {
 
     await bot.sendMessage(
         chatId,
-        "📥 File Received...\n⏳ Processing..."
+        "⏳ Sorting Numbers..."
     );
 
     try {
@@ -108,11 +115,11 @@ bot.on("document", async (msg) => {
         const file =
             await bot.getFile(fileId);
 
-        const url =
+        const fileUrl =
 `https://api.telegram.org/file/bot${TOKEN}/${file.file_path}`;
 
         const response =
-            await fetch(url);
+            await fetch(fileUrl);
 
         const buffer =
             Buffer.from(
@@ -125,15 +132,15 @@ bot.on("document", async (msg) => {
         fs.writeFileSync(localFile, buffer);
 
         const text =
-            await readFile(localFile, mime);
+            await readDocument(localFile, mime);
 
         const numbers =
             extractNumbers(text);
 
-        const fancy =
+        const sorted =
             sortFancy(numbers);
 
-        if (fancy.length === 0) {
+        if (sorted.length === 0) {
 
             return bot.sendMessage(
                 chatId,
@@ -141,26 +148,25 @@ bot.on("document", async (msg) => {
             );
         }
 
-        let result =
-            "✨ Fancy Numbers Sorted ✨\n\n";
+        let output = "";
 
-        fancy.forEach((x, i) => {
+        sorted.forEach((x, i) => {
 
-            result +=
+            output +=
 `${i + 1}. +${x.number}\n`;
         });
 
-        // split long message
+        // telegram safe split
         const chunks = [];
 
         for (
             let i = 0;
-            i < result.length;
+            i < output.length;
             i += 4000
         ) {
 
             chunks.push(
-                result.substring(i, i + 4000)
+                output.substring(i, i + 4000)
             );
         }
 
